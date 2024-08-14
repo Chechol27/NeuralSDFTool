@@ -1,14 +1,53 @@
 import bpy
 import numpy as np
 import os
+from mathutils import Vector
 
 
-def bake_sdf_3d_from_mesh(path_to_3d_model: str) -> np.ndarray:
+
+def get_min_and_max_vertex_coords(mesh_data) -> ((float,float,float), (float, float, float)):
+    firstVertex = mesh_data.vertices[0].co
+    minX, minY, minZ = firstVertex[0], firstVertex[1], firstVertex[2]
+    maxX, maxY, maxZ = 0, 0, 0
+    for v in mesh_data.vertices:
+        minX = min(minX, v.co[0])
+        minY = min(minY, v.co[1])
+        minZ = min(minZ, v.co[2])
+
+        maxX = max(maxX, v.co[0])
+        maxY = max(maxY, v.co[1])
+        maxZ = max(maxZ, v.co[2])
+
+    return (minX, minY, minZ), (maxX, maxY, maxZ)
+
+
+def apply_object_transforms(target_object):
+    bpy.context.view_layer.objects.active = target_object
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+
+
+def simple_lerp(a, b , t):
+    return a * t + b * (1-t)
+
+
+def bake_sdf_3d_from_mesh(path_to_3d_model: str, domain_shape: (int, int, int)) -> np.ndarray:
     bpy.ops.import_scene.fbx(filepath=path_to_3d_model)
     model_name = os.path.splitext(os.path.basename(path_to_3d_model))[0]
     imported_object = bpy.data.objects[model_name]
-    #TODO
-    #Define SDF Volume
-    #Calculate distance foreach discreet point in volume
-    #Return NDArray
-    pass
+    apply_object_transforms(imported_object)
+    res = np.zeros(domain_shape)
+    minV, maxV = get_min_and_max_vertex_coords(imported_object.data)
+    print(res)
+    for x in range(domain_shape[0]):
+        for y in range(domain_shape[1]):
+            for z in range(domain_shape[2]):
+                nco = (x / domain_shape[0], y/domain_shape[1], z/domain_shape[2])
+                object_space_coord = (simple_lerp(minV[0], maxV[0], nco[0]),
+                                      simple_lerp(minV[1], maxV[1], nco[1]),
+                                      simple_lerp(minV[2], maxV[2], nco[2])
+                                      )
+                found, location, normal, index = imported_object.closest_point_on_mesh(object_space_coord)
+                distance = (Vector(object_space_coord) - location).length
+                res[x, y, z] = distance
+    return res
+

@@ -15,6 +15,7 @@ libclang==18.1.1
 Markdown==3.6
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5
+mathutils==3.3.0
 mdurl==0.1.2
 ml-dtypes==0.4.0
 namex==0.0.8
